@@ -1,0 +1,846 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Works '26 — Liquid project slider</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500&family=Outfit:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    :root {
+      --bg: #f6f6f6;
+      --ink: #0b0b0b;
+      --mute: #c6c6c6;
+      --edge: clamp(18px, 4.65vw, 64px);       /* 51px @ 1096 */
+      --title-x: clamp(52px, 10.55vw, 150px);  /* 116px @ 1096 */
+      --cat-x: clamp(64px, 11.1vw, 158px);     /* 122px @ 1096 */
+      --card-h: 214px;                         /* set from JS */
+      --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+    }
+
+    html,
+    body {
+      height: 100%;
+      background: var(--bg);
+    }
+
+    body {
+      font-family: "Inter", "Helvetica Neue", Helvetica, Arial, sans-serif;
+      color: var(--ink);
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      overflow: hidden;
+    }
+
+    a {
+      color: inherit;
+      text-decoration: none;
+    }
+
+    button {
+      font: inherit;
+      color: inherit;
+      background: none;
+      border: 0;
+      cursor: pointer;
+    }
+
+    /* ---------- Section shell ---------- */
+    .works {
+      position: relative;
+      height: 100vh;
+      height: 100svh;
+      min-height: 480px;
+      overflow: hidden;
+      background: var(--bg);
+      touch-action: none;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    .works__gl {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    /* Shown only when WebGL2 is unavailable */
+    .works__fallback {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: min(46.5vh, 70vw);
+      aspect-ratio: 3 / 2;
+      object-fit: cover;
+      border-radius: 18px;
+      transform: translate(-50%, -50%);
+      display: none;
+    }
+
+    .no-gl .works__fallback {
+      display: block;
+    }
+
+    /* ---------- Preloader counter ---------- */
+    .works__count {
+      position: absolute;
+      left: 50%;
+      bottom: 14px;
+      transform: translateX(-50%);
+      font-size: 11px;
+      letter-spacing: 0.01em;
+      font-variant-numeric: tabular-nums;
+      transition: opacity 0.4s ease;
+    }
+
+    .is-loaded .works__count {
+      opacity: 0;
+    }
+
+    /* ---------- Ring title ---------- */
+    .works__ring-title {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      overflow: hidden;
+      font-size: clamp(16px, 3.2vh, 26px);
+      line-height: 1.25;
+      letter-spacing: -0.01em;
+      white-space: nowrap;
+      pointer-events: none;
+    }
+
+    .works__ring-title span {
+      display: block;
+      transform: translateY(110%);
+      transition: transform 0.9s var(--ease), opacity 0.5s ease;
+    }
+
+    .is-ring .works__ring-title span {
+      transform: translateY(0);
+    }
+
+    .is-slider .works__ring-title span {
+      opacity: 0;
+    }
+
+    /* ---------- Project list (top right) ---------- */
+    .works__nav {
+      position: absolute;
+      top: 10px;
+      right: clamp(14px, 9.6vw, 140px);
+      width: 90px;
+      list-style: none;
+      opacity: 0;
+      transition: opacity 0.8s ease;
+      z-index: 3;
+    }
+
+    .is-ring .works__nav,
+    .is-slider .works__nav {
+      opacity: 1;
+    }
+
+    .works__nav button {
+      display: block;
+      width: 100%;
+      text-align: left;
+      font-size: 11px;
+      line-height: 14.05px;
+      white-space: nowrap;
+      color: var(--mute);
+      transition: color 0.35s ease;
+    }
+
+    .works__nav button:hover {
+      color: #8d8d8d;
+    }
+
+    .works__nav button.is-active {
+      color: var(--ink);
+    }
+
+    /* ---------- Slide labels ---------- */
+    .works__label {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      font-family: "Outfit", "Inter", sans-serif;
+      line-height: 1;
+      white-space: nowrap;
+      opacity: 0;
+      transition: opacity 0.6s ease;
+      pointer-events: none;
+      z-index: 2;
+    }
+
+    .is-slider .works__label {
+      opacity: 1;
+    }
+
+    .works__label--idx,
+    .works__label--year {
+      font-size: 14px;
+      margin-top: 2px;
+    }
+
+    .works__label--title,
+    .works__label--cat {
+      font-size: 20px;
+      font-weight: 500;
+      letter-spacing: -0.005em;
+    }
+
+    .works__label--idx {
+      left: var(--edge);
+    }
+
+    .works__label--title {
+      left: var(--title-x);
+    }
+
+    .works__label--cat {
+      right: var(--cat-x);
+    }
+
+    .works__label--year {
+      right: var(--edge);
+    }
+
+    /* liquid text morph — filter is only attached while a label is changing */
+    .works__label.is-morphing {
+      filter: url(#text-goo);
+    }
+
+    .works__svg {
+      position: absolute;
+      width: 0;
+      height: 0;
+    }
+
+    /* ---------- "View" cursor pill ---------- */
+    .works__view {
+      position: absolute;
+      top: 0;
+      left: 0;
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      height: 28px;
+      padding: 0 17px 0 14px;
+      border: 1px solid #cfcfcf;
+      border-radius: 999px;
+      background: rgba(246, 246, 246, 0.82);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      font-size: 11px;
+      line-height: 1;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+      pointer-events: none;
+      will-change: transform;
+      z-index: 4;
+    }
+
+    .works__view svg {
+      width: 9px;
+      height: 9px;
+    }
+
+    .is-slider.has-pointer .works__view {
+      opacity: 1;
+    }
+
+    /* ---------- Tablet ---------- */
+    @media (max-width: 900px) {
+      .works__label--title,
+      .works__label--cat {
+        font-size: 18px;
+      }
+
+      .works__label--idx,
+      .works__label--year {
+        font-size: 13px;
+      }
+
+      .works__nav {
+        right: 14px;
+      }
+    }
+
+    /* ---------- Mobile: labels drop under the card ---------- */
+    @media (max-width: 640px) {
+      :root {
+        --edge: 18px;
+        --title-x: 46px;
+        --cat-x: 62px;
+      }
+
+      .works__label {
+        top: calc(50% + var(--card-h) / 2 + 38px);
+      }
+
+      .works__label--title,
+      .works__label--cat {
+        font-size: 17px;
+      }
+
+      .works__label--idx,
+      .works__label--year {
+        font-size: 12px;
+      }
+
+      .works__nav {
+        top: 8px;
+        right: 4px;
+        width: 78px;
+      }
+
+      .works__nav button {
+        font-size: 10px;
+        line-height: 13px;
+      }
+
+      .works__ring-title {
+        font-size: 15px;
+      }
+
+      .works__view {
+        display: none;
+      }
+    }
+
+    @media (hover: none) {
+      .works__view {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <section class="works" id="works" aria-label="Selected works">
+    <canvas class="works__gl" id="gl"></canvas>
+    <img class="works__fallback" id="fallback" alt="" />
+
+    <div class="works__count" id="count" aria-hidden="true">000</div>
+
+    <h2 class="works__ring-title"><span>Works '26</span></h2>
+
+    <ul class="works__nav" id="nav"></ul>
+
+    <div class="works__label works__label--idx" id="l-idx">01</div>
+    <div class="works__label works__label--title" id="l-title">Matchday</div>
+    <div class="works__label works__label--cat" id="l-cat">Motion</div>
+    <div class="works__label works__label--year" id="l-year">2025</div>
+
+    <div class="works__view" id="view" aria-hidden="true">
+      <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M1.5 8.5 8.5 1.5M3 1.5h5.5V7" />
+      </svg>
+      View
+    </div>
+
+    <svg class="works__svg" aria-hidden="true">
+      <defs>
+        <filter id="text-goo" x="-30%" y="-120%" width="160%" height="340%" color-interpolation-filters="sRGB">
+          <feGaussianBlur id="text-goo-blur" in="SourceGraphic" stdDeviation="0" result="b" />
+          <feColorMatrix in="b" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 26 -11" />
+        </filter>
+      </defs>
+    </svg>
+  </section>
+
+  <script>
+    (() => {
+      /* ---------- Data (images are generated + hosted on Higgsfield) ---------- */
+      const CDN = "https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20261010_";
+      const PROJECTS = [
+        { title: "Matchday",        cat: "Motion",        year: "2025", img: "060012_e71398b7-90ad-4826-bb2c-3da5e12c6642" },
+        { title: "Nightshift",      cat: "Branding",      year: "2025", img: "060049_8690213f-ebf9-4f36-9043-66e05a1977d8" },
+        { title: "Volt",            cat: "Art Direction", year: "2024", img: "060014_d2c69bf8-d267-4480-b3b2-07ba46d1933f" },
+        { title: "Keycard",         cat: "Product",       year: "2025", img: "060013_d86063ab-2498-4568-a4a5-8f9045c14151" },
+        { title: "None",            cat: "Fashion",       year: "2024", img: "060014_198bce5d-40e2-406a-8a89-47ae32f33d9d" },
+        { title: "Prestige Equine", cat: "Branding",      year: "2024", img: "060013_b4661e8b-393f-4267-a0e5-ab6d978b8bcd" },
+        { title: "Blue Room",       cat: "3D",            year: "2023", img: "060049_755ef926-029d-4c28-be63-37f36bbd2e77" },
+        { title: "Steininvest",     cat: "Web Design",    year: "2024", img: "060012_9e219598-c44e-45c8-bc8a-019461c38bce" },
+        { title: "CENE+",           cat: "App Design",    year: "2025", img: "060014_b1b288bb-9286-48e9-9e7b-1b55cc95507a" },
+        { title: "Snuff",           cat: "Packaging",     year: "2024", img: "060049_c73d819c-5cc8-4f04-83ea-ab184785035c" },
+        { title: "Iris",            cat: "Photography",   year: "2023", img: "060013_a45d6bcd-da1e-4dbd-98ab-de310b867e7c" },
+        { title: "Sevenworlds",     cat: "Identity",      year: "2023", img: "060048_66b5c136-fac0-41a5-a023-2890a97cce01" },
+        { title: "Irse a Volver",   cat: "Campaign",      year: "2024", img: "060048_9009607b-9abe-455d-8b7b-404a45258df8" },
+        { title: "PM24",            cat: "Motion",        year: "2024", img: "060050_69b591a9-cc0d-447c-a3ee-4a0a915bd701" },
+        { title: "Favor",           cat: "E-commerce",    year: "2025", img: "060050_8a511a29-1435-436c-bbfa-afe294e2204e" },
+        { title: "Freshweb",        cat: "Web Design",    year: "2025", img: "060048_c1560b75-dd21-4fbc-ae2d-24908d91f5f2" },
+        { title: "Proba",           cat: "Editorial",     year: "2023", img: "060117_bfd764a8-fc09-49ef-b2ce-d6c4233f3f77" },
+        { title: "MVN",             cat: "Branding",      year: "2025", img: "060116_594b39ff-74e6-498b-923a-a5909365c091" }
+      ].map((p) => ({ ...p, src: CDN + p.img + ".png" }));
+
+      const N = PROJECTS.length;
+      const root = document.getElementById("works");
+      const canvas = document.getElementById("gl");
+      const countEl = document.getElementById("count");
+      const navEl = document.getElementById("nav");
+      const viewEl = document.getElementById("view");
+      const labels = {
+        idx: document.getElementById("l-idx"),
+        title: document.getElementById("l-title"),
+        cat: document.getElementById("l-cat"),
+        year: document.getElementById("l-year")
+      };
+      const gooBlur = document.getElementById("text-goo-blur");
+
+      /* ---------- Helpers ---------- */
+      const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+      const mix = (a, b, t) => a + (b - a) * t;
+      const sstep = (a, b, v) => { const t = clamp((v - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
+      const easeIO = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
+      const mod = (v, n) => ((v % n) + n) % n;
+      const wrap = (v) => mod(v + N / 2, N) - N / 2; // [-N/2, N/2)
+      const pad = (n, l) => String(n).padStart(l, "0");
+
+      /* ---------- Nav list ---------- */
+      PROJECTS.forEach((p, i) => {
+        const li = document.createElement("li");
+        const b = document.createElement("button");
+        b.type = "button";
+        b.textContent = p.title;
+        b.addEventListener("click", () => goTo(i));
+        li.appendChild(b);
+        navEl.appendChild(li);
+      });
+      const navBtns = [...navEl.querySelectorAll("button")];
+
+      /* ---------- Label morph ---------- */
+      let active = -1;
+      let morph = null; // { t0, swapped, idx }
+      function setActive(i) {
+        if (i === active) return;
+        const first = active === -1;
+        active = i;
+        navBtns.forEach((b, k) => b.classList.toggle("is-active", k === i));
+        if (first) { writeLabels(i); return; }
+        if (!morph) {
+          morph = { t0: performance.now(), swapped: false };
+          Object.values(labels).forEach((el) => el.classList.add("is-morphing"));
+        } else if (morph.swapped) {
+          // already showing an older slide — restart from the peak of the blur
+          morph = { t0: performance.now() - MORPH / 2, swapped: false };
+        }
+      }
+      function writeLabels(i) {
+        const p = PROJECTS[i];
+        labels.idx.textContent = pad(i + 1, 2);
+        labels.title.textContent = p.title;
+        labels.cat.textContent = p.cat;
+        labels.year.textContent = p.year;
+        document.getElementById("fallback").src = p.src;
+      }
+      const MORPH = 620;
+      function tickMorph(now) {
+        if (!morph) return;
+        const t = clamp((now - morph.t0) / MORPH, 0, 1);
+        if (t >= 0.5 && !morph.swapped) { writeLabels(active); morph.swapped = true; }
+        gooBlur.setAttribute("stdDeviation", (Math.sin(t * Math.PI) * 7).toFixed(2));
+        if (t >= 1) {
+          Object.values(labels).forEach((el) => el.classList.remove("is-morphing"));
+          morph = null;
+        }
+      }
+
+      /* ---------- WebGL ---------- */
+      const gl = canvas.getContext("webgl2", { antialias: false, alpha: false, powerPreference: "high-performance" });
+      const COLS = 5, ROWS = 4, TW = 768, TH = 512;
+
+      const VERT = `#version 300 es
+      in vec2 aPos;
+      void main(){ gl_Position = vec4(aPos, 0.0, 1.0); }`;
+
+      const FRAG = `#version 300 es
+      precision highp float;
+      uniform vec2 uRes;
+      uniform float uDpr, uD, uTime, uWob, uK, uKT;
+      uniform int uN, uNT;
+      uniform vec3 uC[18];
+      uniform vec3 uAx[18];
+      uniform vec3 uAy[18];
+      uniform vec4 uH[18];   // half w, half h, atlas tile, lod
+      uniform vec4 uTa[18];  // thread: a.xy, b.xy
+      uniform vec4 uTb[18];  // thread: end radius, mid radius, tile a, tile b
+      uniform sampler2D uAtlas;
+      uniform vec3 uBg;
+      out vec4 outColor;
+
+      vec3 tile(float t, vec2 uv, float lod){
+        float e = 0.004 * exp2(lod);
+        uv = clamp(uv, e, 1.0 - e);
+        vec2 cell = vec2(mod(t, ${COLS}.0), floor(t / ${COLS}.0));
+        return textureLod(uAtlas, (cell + uv) / vec2(${COLS}.0, ${ROWS}.0), lod).rgb;
+      }
+
+      void main(){
+        vec2 p = (gl_FragCoord.xy - 0.5 * uRes) / uDpr;
+        p.y = -p.y;
+
+        // --- cards: ray / plane hit, rounded-box SDF, smooth union ---
+        float d = 1e5;
+        vec3 col = uBg;
+        vec3 O = vec3(0.0, 0.0, uD);
+        vec3 dir = vec3(p, -uD);
+        for (int i = 0; i < 18; i++) {
+          if (i >= uN) break;
+          vec3 n = cross(uAx[i], uAy[i]);
+          float dn = dot(dir, n);
+          if (abs(dn) < 1e-4) continue;
+          float t = dot(uC[i] - O, n) / dn;
+          if (t <= 0.0) continue;
+          vec3 hit = O + t * dir - uC[i];
+          vec2 l = vec2(dot(hit, uAx[i]), dot(hit, uAy[i]));
+          vec2 h = uH[i].xy;
+          float r = min(h.x, h.y) * 0.17;
+          vec2 q = abs(l) - h + r;
+          float di = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - r;
+          float fi = float(i);
+          float wob = uWob * min(1.0, h.y / 70.0);
+          di += (sin(l.x * 0.043 + uTime * 1.9 + fi * 1.3) + sin(l.y * 0.061 - uTime * 1.5 + fi)) * wob * smoothstep(-40.0, 0.0, di);
+          di /= t;
+          if (di > 90.0) continue;
+          vec3 ci = tile(uH[i].z, l / h * 0.5 + 0.5, uH[i].w);
+          float hh = clamp(0.5 + 0.5 * (d - di) / uK, 0.0, 1.0);
+          d = mix(d, di, hh) - uK * hh * (1.0 - hh);
+          col = mix(col, ci, hh);
+        }
+
+        // --- threads: tapered, wobbling capsules between neighbours ---
+        float dT = 1e5;
+        vec3 cT = uBg;
+        for (int j = 0; j < 18; j++) {
+          if (j >= uNT) break;
+          vec2 a = uTa[j].xy, b = uTa[j].zw;
+          vec2 ab = b - a;
+          float L2 = dot(ab, ab);
+          if (L2 < 1.0) continue;
+          float s = clamp(dot(p - a, ab) / L2, 0.0, 1.0);
+          vec2 nrm = normalize(vec2(-ab.y, ab.x));
+          float fj = float(j);
+          float w = sin(s * 3.14159) * sin(s * 6.0 + uTime * 1.1 + fj * 2.1) * uTb[j].x * 0.3;
+          vec2 c = a + ab * s + nrm * w;
+          float e = abs(2.0 * s - 1.0);
+          float r = mix(uTb[j].y, uTb[j].x, e * e * e);
+          float dj = length(p - c) - r;
+          if (dj > 70.0) continue;
+          vec3 cj = mix(tile(uTb[j].z, vec2(0.5, 0.97), 3.0), tile(uTb[j].w, vec2(0.5, 0.03), 3.0), smoothstep(0.3, 0.7, s));
+          float hh = clamp(0.5 + 0.5 * (dT - dj) / 6.0, 0.0, 1.0);
+          dT = mix(dT, dj, hh) - 6.0 * hh * (1.0 - hh);
+          cT = mix(cT, cj, hh);
+        }
+
+        float hh = clamp(0.5 + 0.5 * (d - dT) / uKT, 0.0, 1.0);
+        float df = mix(d, dT, hh) - uKT * hh * (1.0 - hh);
+        vec3 cf = mix(col, cT, hh * smoothstep(0.0, uKT * 0.6, d));
+
+        float alpha = smoothstep(0.75, -0.75, df * uDpr);
+        outColor = vec4(mix(uBg, cf, alpha), 1.0);
+      }`;
+
+      let prog, U = {}, atlasTex, atlasReady = false;
+      const atlas = document.createElement("canvas");
+      atlas.width = COLS * TW;
+      atlas.height = ROWS * TH;
+      const actx = atlas.getContext("2d");
+
+      function initGL() {
+        const sh = (type, src) => {
+          const s = gl.createShader(type);
+          gl.shaderSource(s, src);
+          gl.compileShader(s);
+          if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s));
+          return s;
+        };
+        prog = gl.createProgram();
+        gl.attachShader(prog, sh(gl.VERTEX_SHADER, VERT));
+        gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, FRAG));
+        gl.linkProgram(prog);
+        if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(prog));
+        gl.useProgram(prog);
+
+        const buf = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+        const loc = gl.getAttribLocation(prog, "aPos");
+        gl.enableVertexAttribArray(loc);
+        gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+
+        ["uRes", "uDpr", "uD", "uTime", "uWob", "uK", "uKT", "uN", "uNT", "uC", "uAx", "uAy", "uH", "uTa", "uTb", "uAtlas", "uBg"]
+          .forEach((n) => (U[n] = gl.getUniformLocation(prog, n)));
+
+        atlasTex = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_2D, atlasTex);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        gl.uniform1i(U.uAtlas, 0);
+        gl.uniform3f(U.uBg, 246 / 255, 246 / 255, 246 / 255);
+      }
+
+      function uploadAtlas() {
+        gl.bindTexture(gl.TEXTURE_2D, atlasTex);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, atlas);
+        gl.generateMipmap(gl.TEXTURE_2D);
+        atlasReady = true;
+      }
+
+      let glOK = !!gl;
+      if (glOK) {
+        try { initGL(); } catch (e) { console.error(e); glOK = false; }
+      }
+      if (!glOK) root.classList.add("no-gl");
+
+      /* ---------- Image loading → atlas + counter ---------- */
+      let loaded = 0, firstDrawn = false, shownPct = 0;
+      PROJECTS.forEach((p, i) => {
+        const im = new Image();
+        im.crossOrigin = "anonymous";
+        im.decoding = "async";
+        const done = (ok) => {
+          const x = (i % COLS) * TW, y = Math.floor(i / COLS) * TH;
+          if (ok) {
+            // cover-fit into the 3:2 tile
+            const s = Math.max(TW / im.naturalWidth, TH / im.naturalHeight);
+            const w = im.naturalWidth * s, h = im.naturalHeight * s;
+            actx.save();
+            actx.beginPath(); actx.rect(x, y, TW, TH); actx.clip();
+            actx.drawImage(im, x + (TW - w) / 2, y + (TH - h) / 2, w, h);
+            actx.restore();
+          } else {
+            actx.fillStyle = "#d9d9d9";
+            actx.fillRect(x, y, TW, TH);
+          }
+          loaded++;
+          if (glOK && (i === 0 || loaded === N)) { uploadAtlas(); if (i === 0) firstDrawn = true; }
+        };
+        im.onload = () => done(true);
+        im.onerror = () => done(false);
+        im.src = p.src;
+      });
+
+      /* ---------- Layout ---------- */
+      let W = 0, H = 0, DPR = 1, UNIT = 0, CAM = 0, RING = 0;
+      function resize() {
+        W = root.clientWidth;
+        H = root.clientHeight;
+        DPR = Math.min(window.devicePixelRatio || 1, W < 700 ? 2 : 1.75);
+        UNIT = Math.min(H, W * 1.5);          // card scale: 322px wide @ 692px tall
+        CAM = UNIT * 0.95;
+        RING = Math.min(0.3625 * H, 0.4 * W); // 251px @ 692px tall
+        root.style.setProperty("--card-h", (UNIT * 0.31).toFixed(1) + "px");
+        if (glOK) {
+          canvas.width = Math.round(W * DPR);
+          canvas.height = Math.round(H * DPR);
+          gl.viewport(0, 0, canvas.width, canvas.height);
+        }
+      }
+      window.addEventListener("resize", resize);
+      resize();
+
+      /* ---------- Slider input ---------- */
+      let pos = 0, target = 0, vel = 0, snapTimer = 0, inputOn = false;
+      const snapSoon = (ms = 140) => {
+        clearTimeout(snapTimer);
+        snapTimer = setTimeout(() => (target = Math.round(target)), ms);
+      };
+      function goTo(i) {
+        if (!inputOn) return;
+        target = Math.round(target) + wrap(i - mod(Math.round(target), N));
+      }
+      root.addEventListener("wheel", (e) => {
+        e.preventDefault();
+        if (!inputOn) return;
+        const dy = e.deltaMode === 1 ? e.deltaY * 32 : e.deltaY;
+        target += clamp(dy, -160, 160) * 0.0085;
+        snapSoon();
+      }, { passive: false });
+
+      let drag = null;
+      root.addEventListener("pointerdown", (e) => {
+        if (!inputOn || e.target.closest(".works__nav")) return;
+        drag = { y: e.clientY, t: target, id: e.pointerId };
+        clearTimeout(snapTimer);
+      });
+      window.addEventListener("pointermove", (e) => {
+        mouse.x = e.clientX; mouse.y = e.clientY;
+        if (e.pointerType === "mouse") root.classList.add("has-pointer");
+        if (drag && e.pointerId === drag.id) target = drag.t - (e.clientY - drag.y) / (H * 0.36);
+      });
+      const endDrag = () => { if (drag) { drag = null; snapSoon(0); } };
+      window.addEventListener("pointerup", endDrag);
+      window.addEventListener("pointercancel", endDrag);
+      document.addEventListener("mouseleave", () => root.classList.remove("has-pointer"));
+      window.addEventListener("keydown", (e) => {
+        if (!inputOn) return;
+        if (e.key === "ArrowDown" || e.key === "ArrowRight" || e.key === "PageDown") target = Math.round(target) + 1;
+        if (e.key === "ArrowUp" || e.key === "ArrowLeft" || e.key === "PageUp") target = Math.round(target) - 1;
+      });
+
+      /* ---------- "View" pill ---------- */
+      const mouse = { x: -200, y: -200 };
+      const pill = { x: -200, y: -200 };
+
+      /* ---------- Scene ---------- */
+      const STEP = (Math.PI * 2) / N;
+      const fC = new Float32Array(18 * 3), fAx = new Float32Array(18 * 3), fAy = new Float32Array(18 * 3);
+      const fH = new Float32Array(18 * 4), fTa = new Float32Array(18 * 4), fTb = new Float32Array(18 * 4);
+      const cards = PROJECTS.map(() => ({ c: [0, 0, 0], ax: [1, 0, 0], ay: [0, 1, 0], hx: 0, hy: 0, m: 0, o: 0, on: false }));
+
+      function basis(rx, ry, rz, card) {
+        const cx = Math.cos(rx), sx = Math.sin(rx), cy = Math.cos(ry), sy = Math.sin(ry), cz = Math.cos(rz), sz = Math.sin(rz);
+        // R = Rz * Ry * Rx, columns 0 and 1
+        card.ax[0] = cz * cy; card.ax[1] = sz * cy; card.ax[2] = -sy;
+        card.ay[0] = cz * sy * sx - sz * cx; card.ay[1] = sz * sy * sx + cz * cx; card.ay[2] = cy * sx;
+      }
+      const project = (card, ly) => {
+        const x = card.c[0] + card.ay[0] * ly, y = card.c[1] + card.ay[1] * ly, z = card.c[2] + card.ay[2] * ly;
+        const s = CAM / (CAM - z);
+        return [x * s, y * s];
+      };
+
+      // timeline (seconds, measured from the moment loading finishes)
+      const T_MOVE = 0.9, T_FAN0 = 0.75, T_FAN = 1.7, T_HOLD = 1.5, T_MORPH = 2.1;
+      let tLoaded = -1, start = performance.now(), last = start;
+
+      function frame(now) {
+        const dt = Math.min(0.05, (now - last) / 1000);
+        last = now;
+        const time = (now - start) / 1000;
+
+        // ----- preloader counter -----
+        const pct = (loaded / N) * 100;
+        const cap = Math.min(pct, (time / 1.6) * 100);
+        shownPct = Math.max(shownPct, cap);
+        if (tLoaded < 0) {
+          countEl.textContent = pad(Math.floor(shownPct), 3);
+          if (shownPct >= 100) { tLoaded = time + 0.35; }
+        }
+        const t = tLoaded < 0 ? -1 : time - tLoaded;
+        if (t >= 0) root.classList.add("is-loaded");
+
+        // ----- phase values -----
+        const move = t < 0 ? 0 : easeIO(clamp(t / T_MOVE, 0, 1));
+        const fan = t < 0 ? 0 : easeIO(clamp((t - T_FAN0) / T_FAN, 0, 1));
+        const tm = t - (T_FAN0 + T_FAN + T_HOLD);
+        const m = clamp(tm / T_MORPH, 0, 1);
+        if (fan > 0.72) root.classList.add("is-ring");
+        if (m > 0.35) root.classList.add("is-slider");
+        if (m > 0.6) inputOn = true;
+
+        // ----- slider motion -----
+        const prev = pos;
+        pos += (target - pos) * (1 - Math.exp(-dt * 6.5));
+        vel = mix(vel, (pos - prev) / Math.max(dt, 1e-3), 0.25);
+        const speed = Math.min(Math.abs(vel), 6);
+        setActive(mod(Math.round(m > 0.5 ? pos : 0), N));
+        tickMorph(now);
+
+        // ----- cards -----
+        // The slider is the same wheel, zoomed in: cards keep travelling on the
+        // circle, with the active one parked at 3 o'clock in the screen centre.
+        const em = easeIO(m);
+        const bigR = (0.445 * H) / Math.sin(STEP);           // neighbours land at ±0.445H
+        const wheelR = RING * Math.pow(bigR / RING, em) * move;
+        const wheelX = -wheelR * em;
+        const ringHx = RING * 0.1335;
+        const sHx = UNIT * 0.2325;
+        let n = 0;
+        for (let i = 0; i < N; i++) {
+          const c = cards[i];
+          const vis = i === 0 ? 1 : sstep(0.0, 0.22, fan);
+          const o = wrap(i - pos);
+          const th = o * STEP * fan;
+          const oc = clamp(o, -3, 3), ao = Math.abs(oc);
+          // depth + tilt grow as a card leaves the centre of the zoomed wheel
+          const z = -Math.min(ao, 2) * 0.2 * UNIT * em;
+          const persp = (CAM - z) / CAM;
+          const sRx = clamp(oc * 1.48, -1.56, 1.56);
+          const sRy = Math.min(ao, 1.5) * 0.9;
+          const lean = clamp(vel, -6, 6) * 0.012 * (1 - Math.min(ao, 1));
+          c.m = em; c.o = o;
+          c.c[0] = (wheelX + Math.cos(th) * wheelR) * persp;
+          c.c[1] = Math.sin(th) * wheelR * persp;
+          c.c[2] = z;
+          c.hx = ringHx * vis * Math.pow(sHx / ringHx, em);
+          c.hy = c.hx / 1.5;
+          basis(sRx * em, sRy * em, th + lean * em, c);
+
+          const s = CAM / (CAM - c.c[2]);
+          const px = c.c[0] * s, py = c.c[1] * s, ext = c.hx * s * 1.3;
+          c.on = c.hx > 0.5 && Math.abs(py) < H / 2 + ext && Math.abs(px) < W / 2 + ext;
+          if (!c.on) continue;
+          c.slot = n;
+          fC.set(c.c, n * 3); fAx.set(c.ax, n * 3); fAy.set(c.ay, n * 3);
+          fH[n * 4] = c.hx; fH[n * 4 + 1] = c.hy; fH[n * 4 + 2] = i;
+          fH[n * 4 + 3] = clamp(Math.log2(TW / (2 * c.hx * s * DPR)), 0, 5);
+          n++;
+        }
+
+        // ----- threads -----
+        let nt = 0;
+        const ringThread = RING * 0.1335 / 1.5 * 0.62 * Math.pow(Math.max(0, 1 - fan / 0.93), 1.4) * (fan > 0 ? 1 : 0);
+        for (let i = 0; i < N; i++) {
+          const j = (i + 1) % N, a = cards[i], b = cards[j];
+          if (!a.on || !b.on) continue;
+          const mm = Math.min(a.m, b.m);
+          const linked = Math.abs(b.o - a.o - 1) < 0.01 && Math.abs(a.o) < 2.6 && Math.abs(b.o) < 2.6 ? 1 : 0;
+          const breathe = 0.5 + 0.5 * Math.sin(time * 0.55 + i * 1.9);
+          const sEnd = UNIT * (0.013 + 0.004 * breathe) + speed * UNIT * 0.004;
+          const sMid = Math.max(0.55, UNIT * 0.0042 * breathe * breathe) + speed * UNIT * 0.0035;
+          const k = linked * mm * mm * mm;
+          const rEnd = ringThread * 1.15 * (1 - mm) + sEnd * k;
+          const rMid = ringThread * 0.55 * (1 - mm) + sMid * k;
+          if (rEnd < 0.2) continue;
+          const A = project(a, a.hy * 0.9 * a.m), B = project(b, -b.hy * 0.9 * b.m);
+          fTa[nt * 4] = A[0]; fTa[nt * 4 + 1] = A[1]; fTa[nt * 4 + 2] = B[0]; fTa[nt * 4 + 3] = B[1];
+          fTb[nt * 4] = rEnd; fTb[nt * 4 + 1] = rMid; fTb[nt * 4 + 2] = i; fTb[nt * 4 + 3] = j;
+          nt++;
+        }
+
+        // ----- draw -----
+        if (glOK) {
+          gl.uniform2f(U.uRes, canvas.width, canvas.height);
+          gl.uniform1f(U.uDpr, DPR);
+          gl.uniform1f(U.uD, CAM);
+          gl.uniform1f(U.uTime, time);
+          gl.uniform1f(U.uWob, 0.35 + speed * 1.5 + Math.sin(em * Math.PI) * 2.5 + (fan > 0 && fan < 1 ? 1.2 : 0));
+          gl.uniform1f(U.uK, mix(RING * 0.05, UNIT * 0.03, em));
+          gl.uniform1f(U.uKT, mix(RING * 0.06, UNIT * 0.03, em));
+          gl.uniform1i(U.uN, atlasReady && firstDrawn ? n : 0);
+          gl.uniform1i(U.uNT, atlasReady ? nt : 0);
+          gl.uniform3fv(U.uC, fC); gl.uniform3fv(U.uAx, fAx); gl.uniform3fv(U.uAy, fAy);
+          gl.uniform4fv(U.uH, fH); gl.uniform4fv(U.uTa, fTa); gl.uniform4fv(U.uTb, fTb);
+          gl.drawArrays(gl.TRIANGLES, 0, 3);
+        }
+
+        // ----- cursor pill -----
+        const r = root.getBoundingClientRect();
+        pill.x += (mouse.x - r.left + 16 - pill.x) * (1 - Math.exp(-dt * 9));
+        pill.y += (mouse.y - r.top + 10 - pill.y) * (1 - Math.exp(-dt * 9));
+        viewEl.style.transform = `translate3d(${pill.x.toFixed(1)}px, ${pill.y.toFixed(1)}px, 0)`;
+
+        requestAnimationFrame(frame);
+      }
+      requestAnimationFrame(frame);
+    })();
+  </script>
+</body>
+</html>
